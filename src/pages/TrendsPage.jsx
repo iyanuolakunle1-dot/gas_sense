@@ -5,7 +5,6 @@
  * Fully responsive: mobile-first + responsive wide layout for desktop.
  */
 import React, { useState, useEffect } from "react";
-import StatusBar from "../components/StatusBar";
 import BottomNav from "../components/BottomNav";
 import { getTrendsData } from "../services/api";
 
@@ -38,8 +37,6 @@ const TrendsPage = () => {
   return (
     <div className="min-h-full flex flex-col justify-between pb-24 md:pb-12">
       <div>
-        <StatusBar time="9:41" />
-
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-6">
           {/* Header Section */}
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

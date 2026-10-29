@@ -6,7 +6,6 @@
  */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import StatusBar from "../components/StatusBar";
 import BottomNav from "../components/BottomNav";
 import ToggleSwitch from "../components/ToggleSwitch";
 import SmsAlertModal from "../components/SmsAlertModal";
@@ -186,8 +185,6 @@ const SettingsPage = () => {
   return (
     <div className="min-h-full flex flex-col justify-between pb-24 md:pb-12">
       <div>
-        <StatusBar time="9:41" />
-
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-6">
           {/* Page Header */}
           <header>

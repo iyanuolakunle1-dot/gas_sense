@@ -6,7 +6,6 @@
  */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import StatusBar from "../components/StatusBar";
 import BottomNav from "../components/BottomNav";
 import GaugeChart from "../components/GaugeChart";
 import CylinderSensorIllustration from "../components/CylinderSensorIllustration";
@@ -42,9 +41,6 @@ const HomePage = () => {
   return (
     <div className="min-h-full flex flex-col justify-between pb-24 md:pb-12">
       <div>
-        {/* Mobile Status Bar (hidden on desktop) */}
-        <StatusBar time="9:41" />
-
         {/* Content Container */}
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6">
           {/* Mobile Header (hidden on desktop) */}

@@ -1,11 +1,9 @@
 /**
  * GaugeChart.jsx
  * --------------
- * Reusable circular arc meter for cylinder gas level.
- * 
- * Props:
- *   percent: number (0 - 100)
- *   status: string (e.g. "Good", "Low", "Critical")
+ * Perfectly centered circular arc meter for cylinder gas level.
+ * Built with native SVG geometry so the percentage and status pill
+ * remain mathematically centered at all screen sizes and resolutions.
  */
 import React from "react";
 
@@ -31,8 +29,8 @@ const describeArc = (x, y, radius, startAngle, endAngle) => {
 
 const GaugeChart = ({ percent = 64, status = "Good" }) => {
   const cx = 110;
-  const cy = 110;
-  const radius = 80;
+  const cy = 100;
+  const radius = 78;
   const strokeWidth = 14;
 
   // Arc sweeps from -220° to 40° (span = 260°)
@@ -40,43 +38,42 @@ const GaugeChart = ({ percent = 64, status = "Good" }) => {
   const endAngle = 40;
   const totalSweep = endAngle - startAngle;
 
-  // Calculate filled end angle
-  const clampedPercent = Math.min(100, Math.max(0, percent));
+  // Clamp percent (0 - 100)
+  const clampedPercent = Math.min(100, Math.max(0, Number(percent) || 0));
   const progressSweep = (clampedPercent / 100) * totalSweep;
   const currentEndAngle = startAngle + progressSweep;
 
   const bgPath = describeArc(cx, cy, radius, startAngle, endAngle);
   const filledPath = describeArc(cx, cy, radius, startAngle, currentEndAngle);
 
-  // Dynamic color based on percent
-  let strokeColor = "#0D6E5D"; // default teal
-  let badgeText = status;
+  // Dynamic status color
+  let strokeColor = "#0D6E5D"; // Teal (Good)
+  let badgeText = status || "Good";
   if (clampedPercent <= 10) {
-    strokeColor = "#E53935"; // Red
+    strokeColor = "#E53935"; // Red (Critical)
     badgeText = "Critical";
   } else if (clampedPercent <= 25) {
-    strokeColor = "#F5A623"; // Orange
+    strokeColor = "#E68A00"; // Orange (Low)
     badgeText = "Low";
   }
 
   return (
-    <div className="relative flex flex-col items-center justify-center my-1 select-none">
+    <div className="flex flex-col items-center justify-center w-full my-2 select-none">
       <svg
-        width="220"
-        height="180"
-        viewBox="0 0 220 180"
-        className="overflow-visible"
+        viewBox="0 0 220 190"
+        className="w-56 sm:w-64 max-w-full h-auto overflow-visible"
+        aria-label={`Gas level ${clampedPercent} percent, status: ${badgeText}`}
       >
-        {/* Track (background arc) */}
+        {/* Background Track (Grey Arc) */}
         <path
           d={bgPath}
           fill="none"
-          stroke="#E4EBEF"
+          stroke="#E2EBE8"
           strokeWidth={strokeWidth}
           strokeLinecap="round"
         />
 
-        {/* Value indicator (foreground arc) */}
+        {/* Foreground Progress (Colored Arc) */}
         {clampedPercent > 0 && (
           <path
             d={filledPath}
@@ -87,25 +84,53 @@ const GaugeChart = ({ percent = 64, status = "Good" }) => {
             className="transition-all duration-700 ease-out"
           />
         )}
-      </svg>
 
-      {/* Center content positioned in the gauge */}
-      <div className="absolute top-[48px] flex flex-col items-center justify-center pointer-events-none">
-        <span className="text-[42px] font-extrabold text-[#0D2329] tracking-tight leading-none">
+        {/* Centered Percentage Text */}
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#0D2329"
+          style={{
+            fontSize: "44px",
+            fontWeight: "800",
+            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+            letterSpacing: "-0.03em",
+          }}
+        >
           {clampedPercent}%
-        </span>
+        </text>
 
-        {/* Status Pill */}
-        <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EAF5F2] text-[#0D6E5D]">
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: strokeColor }}
+        {/* Centered Status Badge Pill */}
+        <g transform={`translate(${cx}, ${cy + 30})`}>
+          {/* Pill background */}
+          <rect
+            x="-38"
+            y="-12"
+            width="76"
+            height="24"
+            rx="12"
+            fill="#EAF5F2"
           />
-          <span className="text-xs font-semibold tracking-wide">
+          {/* Status Dot */}
+          <circle cx="-20" cy="0" r="3.5" fill={strokeColor} />
+          {/* Status Text */}
+          <text
+            x="-10"
+            y="1"
+            dominantBaseline="middle"
+            fill="#0D6E5D"
+            style={{
+              fontSize: "12px",
+              fontWeight: "700",
+              fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+            }}
+          >
             {badgeText}
-          </span>
-        </div>
-      </div>
+          </text>
+        </g>
+      </svg>
     </div>
   );
 };
