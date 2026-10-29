@@ -1,0 +1,20 @@
+/* App.css - GasSense responsive layout styles */
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #F0F6F5;
+}
+
+@media (min-width: 768px) {
+  .app-layout {
+    flex-direction: row;
+  }
+}
+
+.main-content {
+  flex: 1;
+  min-height: 100vh;
+  width: 100%;
+}
