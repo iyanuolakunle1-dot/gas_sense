@@ -389,7 +389,12 @@ const StepThree = ({ onFinish }) => (
 
     {/* CTA */}
     <button
-      onClick={onFinish}
+      onClick={() => {
+        // Mark device as paired so the user goes straight to Dashboard next time.
+        // TODO (backend dev): Replace this with a real API flag from your server.
+        localStorage.setItem("devicePaired", "true");
+        onFinish();
+      }}
       className="w-full py-4 rounded-2xl bg-[#0D6E5D] hover:bg-[#0A574A] active:scale-[0.99] text-white font-bold text-sm shadow-[0_4px_16px_rgba(13,110,93,0.3)] transition-all"
     >
       Go to Dashboard
