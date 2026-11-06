@@ -2,7 +2,12 @@
  * SettingsPage.jsx
  * ----------------
  * App preferences, notification toggles, and alert thresholds.
- * Clean, modular, and easy for any backend developer to maintain.
+ * Sections match the design exactly:
+ *  1. Alert Thresholds  – Low Gas %, Critical Empty %
+ *  2. Notifications     – Push, SMS, Email, Quiet Hours
+ *  3. Display & Units   – Gas unit, Temperature, Theme
+ *  4. Data & Privacy    – Usage sharing, Export, Clear data
+ *  5. Support           – Help Centre, Report a Problem, Rate GasSense, App Version
  */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +17,8 @@ import SmsAlertModal from "../components/SmsAlertModal";
 import EmailReportModal from "../components/EmailReportModal";
 import { getSettings, updateSettings } from "../services/api";
 
-// Reusable SVG Icons for the settings rows
+// ─── Shared Icons ─────────────────────────────────────────────────────────────
+
 const ChevronRight = () => (
   <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#8FA3A0]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="9 18 15 12 9 6" />
@@ -59,44 +65,44 @@ const MoonIcon = () => (
   </svg>
 );
 
-// Reusable card wrapper for settings sections
+// ─── Reusable section card ─────────────────────────────────────────────────────
 const SettingSection = ({ title, children, className = "" }) => (
-  <div className={`bg-white rounded-[26px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-[#E9EFEF] space-y-4 ${className}`}>
-    <h2 className="text-[15px] sm:text-base font-bold text-[#0D2329]">{title}</h2>
-    <div className="space-y-1">{children}</div>
+  <div className={`bg-white rounded-[26px] px-5 py-5 shadow-sm border border-[#E9EFEF] ${className}`}>
+    <h2 className="text-[15px] font-bold text-[#0D2329] mb-3">{title}</h2>
+    <div className="space-y-0.5">{children}</div>
   </div>
 );
 
-// Reusable setting row
+// ─── Reusable setting row ──────────────────────────────────────────────────────
 const SettingRow = ({ icon, label, subtext, right, onClick, onLabelClick, divider = true }) => (
-  <div className={`flex items-center justify-between py-2.5 ${divider ? "border-b border-gray-50" : ""} ${onClick ? "cursor-pointer hover:bg-gray-50/50 -mx-2 px-2 rounded-xl transition-colors" : ""}`} onClick={onClick}>
+  <div
+    className={`flex items-center justify-between py-3 ${divider ? "border-b border-gray-50" : ""} ${onClick ? "cursor-pointer active:bg-gray-50 -mx-1 px-1 rounded-xl transition-colors" : ""}`}
+    onClick={onClick}
+  >
     <div className="flex items-center gap-3">
       {icon && <div className="shrink-0">{icon}</div>}
-      <div onClick={onLabelClick} className={onLabelClick ? "cursor-pointer group" : ""}>
-        <span className={`text-xs sm:text-sm font-semibold text-[#0D2329] ${onLabelClick ? "group-hover:text-[#0D6E5D]" : ""}`}>
-          {label}
-        </span>
+      <div onClick={onLabelClick} className={onLabelClick ? "cursor-pointer" : ""}>
+        <span className="text-sm font-semibold text-[#0D2329]">{label}</span>
         {subtext && (
-          <span className="text-[11px] sm:text-xs text-[#7E918E] ml-2 font-medium underline">
-            {subtext}
-          </span>
+          <span className="text-xs text-[#7E918E] ml-2 font-medium">{subtext}</span>
         )}
       </div>
     </div>
-    {right && <div className="shrink-0">{right}</div>}
+    {right && <div className="shrink-0 ml-3">{right}</div>}
   </div>
 );
 
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 const SettingsPage = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Bottom-sheet modals
+  // Modal state
   const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
-  // 1. Fetch user preferences on mount
+  // 1. Load settings on mount
   useEffect(() => {
     getSettings()
       .then((data) => setSettings(data))
@@ -104,56 +110,36 @@ const SettingsPage = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // 2. Generic helper to update a setting field and sync with backend API
-  const updateSettingField = (section, key, newValue) => {
+  // 2. Generic field updater – syncs to backend automatically
+  const updateSettingField = (section, key, value) => {
     if (!settings) return;
     const updated = {
       ...settings,
-      [section]: {
-        ...settings[section],
-        [key]: newValue,
-      },
+      [section]: { ...settings[section], [key]: value },
     };
     setSettings(updated);
-    updateSettings(updated).catch((err) => {
-      console.error("Failed to sync settings:", err);
-    });
+    updateSettings(updated).catch((err) => console.error("Sync failed:", err));
   };
 
-  // 3. Clear, named toggle handlers
-  const togglePush = () => {
-    updateSettingField("notifications", "pushEnabled", !settings.notifications.pushEnabled);
-  };
+  // 3. Toggle handlers
+  const togglePush    = () => updateSettingField("notifications", "pushEnabled",  !settings.notifications.pushEnabled);
+  const togglePrivacy = () => updateSettingField("privacy",       "usageDataSharing", !settings.privacy.usageDataSharing);
 
   const toggleSms = () => {
-    if (!settings.notifications.smsEnabled) {
-      setIsSmsModalOpen(true);
-    } else {
-      updateSettingField("notifications", "smsEnabled", false);
-    }
+    if (!settings.notifications.smsEnabled) setIsSmsModalOpen(true);
+    else updateSettingField("notifications", "smsEnabled", false);
   };
 
   const toggleEmail = () => {
-    if (!settings.notifications.emailEnabled) {
-      setIsEmailModalOpen(true);
-    } else {
-      updateSettingField("notifications", "emailEnabled", false);
-    }
-  };
-
-  const togglePrivacy = () => {
-    updateSettingField("privacy", "usageDataSharing", !settings.privacy.usageDataSharing);
+    if (!settings.notifications.emailEnabled) setIsEmailModalOpen(true);
+    else updateSettingField("notifications", "emailEnabled", false);
   };
 
   // 4. Modal save handlers
   const handleSaveSms = ({ phone }) => {
     const updated = {
       ...settings,
-      notifications: {
-        ...settings.notifications,
-        smsPhone: phone,
-        smsEnabled: true,
-      },
+      notifications: { ...settings.notifications, smsPhone: phone, smsEnabled: true },
     };
     setSettings(updated);
     updateSettings(updated);
@@ -162,20 +148,18 @@ const SettingsPage = () => {
   const handleSaveEmail = () => {
     const updated = {
       ...settings,
-      notifications: {
-        ...settings.notifications,
-        emailEnabled: true,
-      },
+      notifications: { ...settings.notifications, emailEnabled: true },
     };
     setSettings(updated);
     updateSettings(updated);
   };
 
+  // ── Loading state ──
   if (loading || !settings) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] py-20">
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="w-9 h-9 border-[3px] border-[#0D6E5D] border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-medium text-[#5F7470] mt-3">Loading preferences...</span>
+        <span className="text-xs font-medium text-[#5F7470] mt-3">Loading preferences…</span>
       </div>
     );
   }
@@ -184,206 +168,175 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-full flex flex-col justify-between pb-24 md:pb-12">
-      <div>
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-6">
-          {/* Page Header */}
-          <header>
-            <h1 className="text-[26px] sm:text-3xl font-extrabold text-[#0D2329] tracking-tight leading-tight">
-              Settings
-            </h1>
-            <p className="text-xs sm:text-sm font-medium text-[#6C807D] tracking-wide mt-0.5">
-              App alerts, notifications, unit displays, and sensor preferences
-            </p>
-          </header>
+      <div className="w-full max-w-xl mx-auto md:max-w-3xl px-4 sm:px-6 py-4 space-y-4">
 
-          <main className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Section 1: Alert Thresholds */}
-            <SettingSection title="Alert Thresholds">
-              <SettingRow
-                label="Low Gas Alert"
-                icon={
-                  <div className="w-8 h-8 rounded-full bg-[#FEF4E5] text-[#E68A00] flex items-center justify-center">
-                    <BellIcon />
-                  </div>
-                }
-                right={
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs sm:text-sm font-bold text-[#D97706]">{alerts.lowGasPercent}%</span>
-                    <span className="w-2 h-2 rounded-full bg-[#E68A00]" />
-                  </div>
-                }
-              />
-              <SettingRow
-                label="Critical Empty Alert"
-                icon={
-                  <div className="w-8 h-8 rounded-full bg-[#FEECEC] text-[#E53935] flex items-center justify-center">
-                    <AlertCircleIcon />
-                  </div>
-                }
-                right={
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs sm:text-sm font-bold text-[#E53935]">{alerts.criticalEmptyPercent}%</span>
-                    <span className="w-2 h-2 rounded-full bg-[#E53935]" />
-                  </div>
-                }
-                divider={false}
-              />
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={() => navigate("/alerts")}
-                  className="text-xs font-bold text-[#0D6E5D] flex items-center gap-1 hover:underline"
-                >
-                  Customize &amp; View History <ChevronRight />
-                </button>
+        {/* ── Page Header ── */}
+        <header className="mb-1">
+          <h1 className="text-[26px] font-extrabold text-[#0D2329] tracking-tight leading-tight">
+            Settings
+          </h1>
+          <p className="text-xs font-medium text-[#6C807D] mt-0.5">
+            App &amp; sensor preferences
+          </p>
+        </header>
+
+        {/* ── 1. Alert Thresholds ── */}
+        <SettingSection title="Alert Thresholds">
+          <SettingRow
+            label="Low Gas Alert"
+            icon={
+              <div className="w-8 h-8 rounded-full bg-[#FEF4E5] text-[#E68A00] flex items-center justify-center">
+                <BellIcon />
               </div>
-            </SettingSection>
-
-            {/* Section 2: Notifications */}
-            <SettingSection title="Notifications">
-              <SettingRow
-                label="Push Notifications"
-                icon={<PhoneIcon />}
-                right={
-                  <ToggleSwitch
-                    checked={notifications.pushEnabled}
-                    onChange={togglePush}
-                  />
-                }
-              />
-              <SettingRow
-                label="SMS Alerts"
-                subtext={notifications.smsPhone}
-                icon={<MessageSquareIcon />}
-                onLabelClick={() => setIsSmsModalOpen(true)}
-                right={
-                  <ToggleSwitch
-                    checked={notifications.smsEnabled}
-                    onChange={toggleSms}
-                  />
-                }
-              />
-              <SettingRow
-                label="Email Reports"
-                icon={<MailIcon />}
-                onLabelClick={() => setIsEmailModalOpen(true)}
-                right={
-                  <ToggleSwitch
-                    checked={notifications.emailEnabled}
-                    onChange={toggleEmail}
-                  />
-                }
-              />
-              <SettingRow
-                label="Quiet Hours"
-                icon={<MoonIcon />}
-                right={
-                  <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-[#0D2329]">
-                    <span>{notifications.quietHours}</span>
-                    <ChevronRight />
-                  </div>
-                }
-                divider={false}
-              />
-            </SettingSection>
-
-            {/* Section 3: Display & Units */}
-            <SettingSection title="Display &amp; Units">
-              <SettingRow
-                label="Gas Unit"
-                right={
-                  <div className="flex items-center gap-1 font-bold text-[#0D2329] text-xs sm:text-sm">
-                    <span>{display.gasUnit}</span>
-                    <ChevronRight />
-                  </div>
-                }
-              />
-              <SettingRow
-                label="Temperature"
-                right={
-                  <div className="flex items-center gap-1 font-bold text-[#0D2329] text-xs sm:text-sm">
-                    <span>{display.temperature}</span>
-                    <ChevronRight />
-                  </div>
-                }
-              />
-              <SettingRow
-                label="Theme"
-                right={
-                  <div className="flex items-center gap-1 font-bold text-[#0D2329] text-xs sm:text-sm">
-                    <span>{display.theme}</span>
-                    <ChevronRight />
-                  </div>
-                }
-                divider={false}
-              />
-            </SettingSection>
-
-            {/* Section 4: Data & Privacy */}
-            <SettingSection title="Data &amp; Privacy">
-              <SettingRow
-                label="Usage Data Sharing"
-                right={
-                  <ToggleSwitch
-                    checked={privacy.usageDataSharing}
-                    onChange={togglePrivacy}
-                  />
-                }
-              />
-              <SettingRow
-                label="Export Usage History"
-                right={<ChevronRight />}
-                onClick={() => alert("Usage history export generated as CSV.")}
-              />
-              <SettingRow
-                label="Clear Local Data"
-                right={<ChevronRight />}
-                onClick={() => {
-                  if (window.confirm("Clear all locally cached sensor data?")) {
-                    localStorage.clear();
-                    alert("Local cache cleared.");
-                  }
-                }}
-                divider={false}
-              />
-            </SettingSection>
-
-            {/* Section 5: Support & Diagnostics */}
-            <SettingSection title="Support &amp; Troubleshooting" className="md:col-span-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                <SettingRow
-                  label="Sensor Health &amp; Diagnostics"
-                  right={<ChevronRight />}
-                  onClick={() => navigate("/diagnostics")}
-                />
-                <SettingRow
-                  label="Pair New Sensor (Setup Wizard)"
-                  right={<ChevronRight />}
-                  onClick={() => navigate("/setup")}
-                />
-                <SettingRow
-                  label="Help Centre"
-                  right={<ChevronRight />}
-                  onClick={() => window.open("https://google.com", "_blank")}
-                />
-                <SettingRow
-                  label="Report a Problem"
-                  right={<ChevronRight />}
-                  onClick={() => alert("Report form: Please contact support@gassense.io")}
-                />
-                <SettingRow
-                  label="App Version"
-                  right={<span className="font-bold text-[#0D2329] text-xs sm:text-sm">v1.2.0 (Build 48)</span>}
-                  divider={false}
-                />
+            }
+            right={
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-[#D97706]">{alerts.lowGasPercent}%</span>
+                <span className="w-2 h-2 rounded-full bg-[#E68A00]" />
               </div>
-            </SettingSection>
-          </main>
-        </div>
+            }
+          />
+          <SettingRow
+            label="Critical Empty Alert"
+            icon={
+              <div className="w-8 h-8 rounded-full bg-[#FEECEC] text-[#E53935] flex items-center justify-center">
+                <AlertCircleIcon />
+              </div>
+            }
+            right={
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-[#E53935]">{alerts.criticalEmptyPercent}%</span>
+                <span className="w-2 h-2 rounded-full bg-[#E53935]" />
+              </div>
+            }
+            divider={false}
+          />
+          {/* Customize link */}
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => navigate("/alerts")}
+              className="text-xs font-bold text-[#0D6E5D] flex items-center gap-0.5 hover:underline"
+            >
+              Customize <ChevronRight />
+            </button>
+          </div>
+        </SettingSection>
+
+        {/* ── 2. Notifications ── */}
+        <SettingSection title="Notifications">
+          <SettingRow
+            label="Push Notifications"
+            icon={<PhoneIcon />}
+            right={<ToggleSwitch checked={notifications.pushEnabled} onChange={togglePush} />}
+          />
+          <SettingRow
+            label="SMS Alerts"
+            subtext={notifications.smsPhone}
+            icon={<MessageSquareIcon />}
+            onLabelClick={() => setIsSmsModalOpen(true)}
+            right={<ToggleSwitch checked={notifications.smsEnabled} onChange={toggleSms} />}
+          />
+          <SettingRow
+            label="Email Reports"
+            icon={<MailIcon />}
+            onLabelClick={() => setIsEmailModalOpen(true)}
+            right={<ToggleSwitch checked={notifications.emailEnabled} onChange={toggleEmail} />}
+          />
+          <SettingRow
+            label="Quiet Hours"
+            icon={<MoonIcon />}
+            right={
+              <div className="flex items-center gap-0.5 text-sm font-bold text-[#0D2329]">
+                {notifications.quietHours} <ChevronRight />
+              </div>
+            }
+            divider={false}
+          />
+        </SettingSection>
+
+        {/* ── 3. Display & Units ── */}
+        <SettingSection title="Display &amp; Units">
+          <SettingRow
+            label="Gas Unit"
+            right={
+              <div className="flex items-center gap-0.5 font-bold text-[#0D2329] text-sm">
+                {display.gasUnit} <ChevronRight />
+              </div>
+            }
+          />
+          <SettingRow
+            label="Temperature"
+            right={
+              <div className="flex items-center gap-0.5 font-bold text-[#0D2329] text-sm">
+                {display.temperature} <ChevronRight />
+              </div>
+            }
+          />
+          <SettingRow
+            label="Theme"
+            right={
+              <div className="flex items-center gap-0.5 font-bold text-[#0D2329] text-sm">
+                {display.theme} <ChevronRight />
+              </div>
+            }
+            divider={false}
+          />
+        </SettingSection>
+
+        {/* ── 4. Data & Privacy ── */}
+        <SettingSection title="Data &amp; Privacy">
+          <SettingRow
+            label="Usage Data Sharing"
+            right={<ToggleSwitch checked={privacy.usageDataSharing} onChange={togglePrivacy} />}
+          />
+          <SettingRow
+            label="Export Usage History"
+            right={<ChevronRight />}
+            onClick={() => alert("Usage history export generated as CSV.")}
+          />
+          <SettingRow
+            label="Clear Local Data"
+            right={<ChevronRight />}
+            onClick={() => {
+              if (window.confirm("Clear all locally cached sensor data?")) {
+                localStorage.removeItem("devicePaired");
+                alert("Local data cleared.");
+              }
+            }}
+            divider={false}
+          />
+        </SettingSection>
+
+        {/* ── 5. Support ── */}
+        <SettingSection title="Support">
+          <SettingRow
+            label="Help Centre"
+            right={<ChevronRight />}
+            onClick={() => window.open("https://google.com", "_blank")}
+          />
+          <SettingRow
+            label="Report a Problem"
+            right={<ChevronRight />}
+            onClick={() => alert("Contact support@gassense.io")}
+          />
+          <SettingRow
+            label="Rate GasSense"
+            right={<ChevronRight />}
+            onClick={() => alert("Thank you! Redirecting to app store…")}
+          />
+          <SettingRow
+            label="App Version"
+            right={<span className="font-bold text-[#0D2329] text-sm">v1.2.0 (Build 48)</span>}
+            divider={false}
+          />
+        </SettingSection>
+
       </div>
 
+      {/* Bottom navigation */}
       <BottomNav active="settings" />
 
-      {/* SMS Configuration Modal Sheet */}
+      {/* SMS modal */}
       <SmsAlertModal
         isOpen={isSmsModalOpen}
         onClose={() => setIsSmsModalOpen(false)}
@@ -391,7 +344,7 @@ const SettingsPage = () => {
         onSave={handleSaveSms}
       />
 
-      {/* Email Report Configuration Modal Sheet */}
+      {/* Email modal */}
       <EmailReportModal
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
