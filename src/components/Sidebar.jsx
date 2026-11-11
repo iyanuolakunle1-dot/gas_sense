@@ -108,7 +108,7 @@ const Sidebar = () => {
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="w-2 h-2 rounded-full bg-[#0D6E5D] animate-pulse" />
               <span className="text-[11px] font-semibold text-[#6C807D]">
-                GS-V2.1 Connected
+                Live sensor account
               </span>
             </div>
           </div>

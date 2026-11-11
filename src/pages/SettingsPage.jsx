@@ -9,13 +9,29 @@
  *  4. Data & Privacy    – Usage sharing, Export, Clear data
  *  5. Support           – Help Centre, Report a Problem, Rate GasSense, App Version
  */
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
 import ToggleSwitch from "../components/ToggleSwitch";
 import SmsAlertModal from "../components/SmsAlertModal";
 import EmailReportModal from "../components/EmailReportModal";
-import { getSettings, updateSettings } from "../services/api";
+
+const DEFAULT_SETTINGS = {
+  alerts: { lowGasPercent: 20, criticalEmptyPercent: 5 },
+  notifications: {
+    pushEnabled: true,
+    smsEnabled: true,
+    smsPhone: "+234 812 XXX XXXX",
+    emailEnabled: false,
+    quietHours: "11 PM - 6 AM",
+  },
+  display: {
+    gasUnit: "Kilograms (kg)",
+    temperature: "Celsius (°C)",
+    theme: "System Default",
+  },
+  privacy: { usageDataSharing: false },
+};
 
 // ─── Shared Icons ─────────────────────────────────────────────────────────────
 
@@ -95,30 +111,19 @@ const SettingRow = ({ icon, label, subtext, right, onClick, onLabelClick, divide
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 const SettingsPage = () => {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
   // Modal state
   const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
-  // 1. Load settings on mount
-  useEffect(() => {
-    getSettings()
-      .then((data) => setSettings(data))
-      .catch((err) => console.error("Failed to load settings:", err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // 2. Generic field updater – syncs to backend automatically
+  // Settings are intentionally local defaults for the prototype.
   const updateSettingField = (section, key, value) => {
-    if (!settings) return;
     const updated = {
       ...settings,
       [section]: { ...settings[section], [key]: value },
     };
     setSettings(updated);
-    updateSettings(updated).catch((err) => console.error("Sync failed:", err));
   };
 
   // 3. Toggle handlers
@@ -135,14 +140,13 @@ const SettingsPage = () => {
     else updateSettingField("notifications", "emailEnabled", false);
   };
 
-  // 4. Modal save handlers
+  // Modal save handlers
   const handleSaveSms = ({ phone }) => {
     const updated = {
       ...settings,
       notifications: { ...settings.notifications, smsPhone: phone, smsEnabled: true },
     };
     setSettings(updated);
-    updateSettings(updated);
   };
 
   const handleSaveEmail = () => {
@@ -151,18 +155,7 @@ const SettingsPage = () => {
       notifications: { ...settings.notifications, emailEnabled: true },
     };
     setSettings(updated);
-    updateSettings(updated);
   };
-
-  // ── Loading state ──
-  if (loading || !settings) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="w-9 h-9 border-[3px] border-[#0D6E5D] border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-medium text-[#5F7470] mt-3">Loading preferences…</span>
-      </div>
-    );
-  }
 
   const { alerts, notifications, display, privacy } = settings;
 
@@ -298,10 +291,7 @@ const SettingsPage = () => {
             label="Clear Local Data"
             right={<ChevronRight />}
             onClick={() => {
-              if (window.confirm("Clear all locally cached sensor data?")) {
-                localStorage.removeItem("devicePaired");
-                alert("Local data cleared.");
-              }
+              alert("GasSense does not store sensor data locally.");
             }}
             divider={false}
           />

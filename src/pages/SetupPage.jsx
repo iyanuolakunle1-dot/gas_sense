@@ -8,12 +8,13 @@
  * Step 3 – Sensor Connected!      (success summary + "Go to Dashboard" CTA)
  *
  * Each step is a local component for clarity.
- * State management is intentionally minimal so the backend dev can
- * swap the simulated delays / mock Bluetooth scan with real BLE logic.
+ * Discovery and pairing are performed through the live API. Native BLE permission
+ * handling can be added around the discovery call when hardware is available.
  */
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getApiError, getNearbySensors, pairSensor } from "../services/api";
 
 // ─── Shared progress bar ─────────────────────────────────────────────────────
 const StepProgress = ({ current }) => (
@@ -144,32 +145,47 @@ const StepOne = ({ onNext }) => (
       onClick={onNext}
       className="w-full py-4 rounded-2xl bg-[#0D6E5D] hover:bg-[#0A574A] active:scale-[0.99] text-white font-bold text-sm shadow-[0_4px_16px_rgba(13,110,93,0.3)] transition-all"
     >
-      Pair sensor
+      Sensor is ready
     </button>
   </>
 );
 
 // ─── STEP 2: Connect your sensor (BLE scan) ───────────────────────────────────
 const StepTwo = ({ onNext }) => {
-  /**
-   * scanning: true  → shows spinner
-   * scanning: false → shows found device
-   *
-   * TODO (backend dev): Replace the setTimeout with a real Bluetooth scan.
-   * Call the BLE pairing API here and invoke onNext() on success.
-   */
+  /** Load the nearby sensors returned by the live API. */
   const [scanning, setScanning] = useState(true);
-  const [selected, setSelected] = useState(false);
+  const [sensors, setSensors] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const timer = setTimeout(() => setScanning(false), 2000);
-    return () => clearTimeout(timer);
+    scan();
   }, []);
 
-  const handleRescan = () => {
+  const scan = async () => {
     setScanning(true);
-    setSelected(false);
-    setTimeout(() => setScanning(false), 2000);
+    setSelected(null);
+    setError("");
+    try {
+      const response = await getNearbySensors();
+      setSensors(response.sensors || []);
+    } catch (err) {
+      setError(getApiError(err));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handlePair = async () => {
+    if (!selected) return;
+    try {
+      const pairing = await pairSensor(selected.sensorId);
+      const pairedSensorId = pairing.sensor?.sensorId || selected.sensorId;
+      localStorage.setItem("gassense_active_sensor_id", pairedSensorId);
+      onNext({ ...selected, ...pairing.sensor, sensorId: pairedSensorId });
+    } catch (err) {
+      setError(getApiError(err));
+    }
   };
 
   return (
@@ -200,7 +216,7 @@ const StepTwo = ({ onNext }) => {
         </div>
 
         <p className="text-xs font-semibold text-[#0D6E5D] mb-3">
-          {scanning ? "Scanning…" : "1 sensor found"}
+          {scanning ? "Scanning…" : `${sensors.length} sensor${sensors.length === 1 ? "" : "s"} found`}
         </p>
         <h2 className="text-xl font-extrabold text-[#0D2329]">Connect your sensor</h2>
         <p className="text-sm text-[#6C807D] leading-relaxed mt-2 max-w-xs">
@@ -213,7 +229,7 @@ const StepTwo = ({ onNext }) => {
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-bold text-[#0D2329]">Nearby sensor</span>
           <button
-            onClick={handleRescan}
+            onClick={scan}
             className="flex items-center gap-1.5 text-xs font-semibold text-[#0D6E5D] hover:opacity-70 transition-opacity"
           >
             {/* Refresh icon */}
@@ -230,13 +246,8 @@ const StepTwo = ({ onNext }) => {
             <div className="w-5 h-5 border-2 border-[#0D6E5D] border-t-transparent rounded-full animate-spin" />
             <span className="text-sm text-[#6C807D]">Looking for sensors…</span>
           </div>
-        ) : (
-          <button
-            onClick={() => setSelected((s) => !s)}
-            className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors ${
-              selected ? "border-[#0D6E5D] bg-[#F2FAF7]" : "border-[#E9EFEF] bg-white"
-            }`}
-          >
+        ) : sensors.length ? sensors.map((sensor) => (
+          <button key={sensor.sensorId} onClick={() => setSelected(sensor)} className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors ${selected?.sensorId === sensor.sensorId ? "border-[#0D6E5D] bg-[#F2FAF7]" : "border-[#E9EFEF] bg-white"}`}>
             <div className="flex items-center gap-3">
               {/* Chip icon */}
               <div className="w-9 h-9 rounded-xl bg-[#EBF6F9] flex items-center justify-center">
@@ -254,22 +265,23 @@ const StepTwo = ({ onNext }) => {
                 </svg>
               </div>
               <div className="text-left">
-                <p className="text-sm font-bold text-[#0D2329]">GS-V2.1-A4F7</p>
-                <p className="text-xs text-[#6C807D]">Strong signal · Ready to pair</p>
+                <p className="text-sm font-bold text-[#0D2329]">{sensor.sensorId}</p>
+                <p className="text-xs text-[#6C807D]">{sensor.signalStrength >= 70 ? "Strong signal" : "Nearby"} · {sensor.status === "PAIRED" ? "Paired" : "Ready to pair"}</p>
               </div>
             </div>
             {/* Check circle */}
             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-              selected ? "border-[#0D6E5D] bg-[#0D6E5D]" : "border-[#D6E6E2]"
+              selected?.sensorId === sensor.sensorId ? "border-[#0D6E5D] bg-[#0D6E5D]" : "border-[#D6E6E2]"
             }`}>
-              {selected && (
+              {selected?.sensorId === sensor.sensorId && (
                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="3">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               )}
             </div>
           </button>
-        )}
+        )) : <p className="text-sm text-[#6C807D] py-2">No sensors found. Check Bluetooth and try again.</p>}
+        {error && <p className="text-xs text-[#9B2C2C] font-semibold mt-3" role="alert">{error}</p>}
       </div>
 
       {/* Bluetooth tip */}
@@ -284,7 +296,7 @@ const StepTwo = ({ onNext }) => {
 
       {/* CTA */}
       <button
-        onClick={onNext}
+        onClick={handlePair}
         disabled={!selected || scanning}
         className={`w-full py-4 rounded-2xl font-bold text-sm transition-all ${
           selected && !scanning
@@ -292,14 +304,14 @@ const StepTwo = ({ onNext }) => {
             : "bg-[#D6E6E2] text-[#6C807D] cursor-not-allowed"
         }`}
       >
-        Sensor is ready
+        Pair sensor
       </button>
     </>
   );
 };
 
 // ─── STEP 3: Connected ────────────────────────────────────────────────────────
-const StepThree = ({ onFinish }) => (
+const StepThree = ({ sensor, onFinish }) => (
   <>
     {/* Hero card */}
     <div className="bg-white rounded-[26px] p-7 shadow-sm border border-[#E9EFEF] flex flex-col items-center text-center">
@@ -339,7 +351,7 @@ const StepThree = ({ onFinish }) => (
             </svg>
           ),
           label: "Device Name",
-          value: "GS-V2.1-A4F7",
+          value: sensor?.sensorId || "Paired sensor",
           valueClass: "text-[#0D2329]",
         },
         {
@@ -350,7 +362,7 @@ const StepThree = ({ onFinish }) => (
             </svg>
           ),
           label: "Sensor Battery",
-          value: "98% (Excellent)",
+          value: sensor?.batteryLevel != null ? `${sensor.batteryLevel}%` : "Not reported",
           valueClass: "text-[#0D6E5D]",
         },
         {
@@ -363,7 +375,7 @@ const StepThree = ({ onFinish }) => (
             </svg>
           ),
           label: "Signal Strength",
-          value: "Strong",
+          value: sensor?.signalStrength != null ? `${sensor.signalStrength} dBm` : "Not reported",
           valueClass: "text-[#0D2329]",
         },
       ].map(({ icon, label, value, valueClass }) => (
@@ -389,12 +401,7 @@ const StepThree = ({ onFinish }) => (
 
     {/* CTA */}
     <button
-      onClick={() => {
-        // Mark device as paired so the user goes straight to Dashboard next time.
-        // TODO (backend dev): Replace this with a real API flag from your server.
-        localStorage.setItem("devicePaired", "true");
-        onFinish();
-      }}
+      onClick={onFinish}
       className="w-full py-4 rounded-2xl bg-[#0D6E5D] hover:bg-[#0A574A] active:scale-[0.99] text-white font-bold text-sm shadow-[0_4px_16px_rgba(13,110,93,0.3)] transition-all"
     >
       Go to Dashboard
@@ -406,6 +413,7 @@ const StepThree = ({ onFinish }) => (
 const SetupPage = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1 | 2 | 3
+  const [pairedSensor, setPairedSensor] = useState(null);
 
   const goBack = () => {
     if (step > 1) setStep((s) => s - 1);
@@ -415,8 +423,8 @@ const SetupPage = () => {
   return (
     <Shell step={step} onBack={goBack}>
       {step === 1 && <StepOne onNext={() => setStep(2)} />}
-      {step === 2 && <StepTwo onNext={() => setStep(3)} />}
-      {step === 3 && <StepThree onFinish={() => navigate("/")} />}
+      {step === 2 && <StepTwo onNext={(sensor) => { setPairedSensor(sensor); setStep(3); }} />}
+      {step === 3 && <StepThree sensor={pairedSensor} onFinish={() => navigate("/")} />}
     </Shell>
   );
 };

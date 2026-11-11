@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
 import CylinderSensorIllustration from "../components/CylinderSensorIllustration";
-import { getDeviceInfo, recalibrateSensor, unpairDevice } from "../services/api";
+import { getApiError, getPrototypeDevice, recalibratePrototypeSensor, unpairPrototypeSensor } from "../services/api";
 
 const DevicePage = () => {
   const [device, setDevice] = useState(null);
@@ -15,12 +15,12 @@ const DevicePage = () => {
   const [statusMessage, setStatusMessage] = useState("");
 
   useEffect(() => {
-    getDeviceInfo()
+    getPrototypeDevice(localStorage.getItem("gassense_active_sensor_id"))
       .then((data) => {
         setDevice(data);
       })
       .catch((err) => {
-        console.error("Failed to load device info:", err);
+        console.error("Failed to load device info:", getApiError(err));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -28,7 +28,7 @@ const DevicePage = () => {
   const handleRecalibrate = async () => {
     setStatusMessage("Calibrating sensor... Please wait.");
     try {
-      const res = await recalibrateSensor();
+      const res = await recalibratePrototypeSensor(localStorage.getItem("gassense_active_sensor_id"));
       setStatusMessage(res.message || "Sensor calibrated successfully.");
     } catch {
       setStatusMessage("Calibration failed. Please try again.");
@@ -44,7 +44,8 @@ const DevicePage = () => {
 
     setStatusMessage("Unpairing sensor...");
     try {
-      await unpairDevice();
+      await unpairPrototypeSensor(localStorage.getItem("gassense_active_sensor_id"));
+      localStorage.removeItem("gassense_active_sensor_id");
       setStatusMessage("Device unpaired successfully.");
     } catch {
       setStatusMessage("Unpair failed. Check connection.");
@@ -224,3 +225,4 @@ const DevicePage = () => {
 };
 
 export default DevicePage;
+

@@ -6,33 +6,31 @@
  */
 import React, { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
-import { getTrendsData } from "../services/api";
+import { getApiError, getSessionContext, getTrendsData } from "../services/api";
 
-const PERIODS = [
-  { key: "daily", label: "Daily" },
-  { key: "weekly", label: "Weekly" },
-  { key: "monthly", label: "Monthly" },
-];
+const Insight = ({ label, value }) => (
+  <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E9EFEF]">
+    <p className="text-[11px] font-semibold text-[#7E918E]">{label}</p>
+    <p className="text-sm font-bold text-[#0D2329] mt-1">{value}</p>
+  </div>
+);
 
 const TrendsPage = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState("weekly");
   const [trends, setTrends] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    getTrendsData(selectedPeriod)
+    getSessionContext().then(({ sensorId }) => getTrendsData(sensorId, "weekly"))
       .then((data) => {
         setTrends(data);
       })
-      .catch((err) => {
-        console.error("Failed to load trends:", err);
-      })
+      .catch((err) => console.error("Failed to load trends:", getApiError(err)))
       .finally(() => setLoading(false));
-  }, [selectedPeriod]);
+  }, []);
 
   const bars = trends?.bars || [];
-  const maxVal = bars.length > 0 ? Math.max(...bars.map((b) => b.kg)) : 1;
+  const maxVal = bars.length > 0 ? Math.max(1, ...bars.map((b) => b.kg)) : 1;
 
   return (
     <div className="min-h-full flex flex-col justify-between pb-24 md:pb-12">
@@ -49,25 +47,6 @@ const TrendsPage = () => {
               </p>
             </div>
 
-            {/* Period Tab Switcher */}
-            <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-sm border border-[#E9EFEF] w-full sm:w-auto sm:min-w-[280px]">
-              {PERIODS.map(({ key, label }) => {
-                const active = selectedPeriod === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedPeriod(key)}
-                    className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all ${
-                      active
-                        ? "bg-[#0D6E5D] text-white shadow-sm"
-                        : "text-[#0D6E5D] hover:bg-gray-50"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
           </header>
 
           <main className="space-y-6">
@@ -75,11 +54,7 @@ const TrendsPage = () => {
             <div className="bg-white rounded-[26px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-[#E9EFEF]">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-[15px] sm:text-base font-bold text-[#0D2329]">
-                  {selectedPeriod === "weekly"
-                    ? "Weekly Consumption (kg)"
-                    : selectedPeriod === "daily"
-                    ? "Daily Consumption (kg)"
-                    : "Monthly Consumption (kg)"}
+                  Weekly Consumption (kg)
                 </h2>
                 <span className="text-xs sm:text-sm font-semibold text-[#6C807D]">
                   Total: {trends?.totalKg?.toFixed(2) || "0.00"} kg
@@ -133,60 +108,15 @@ const TrendsPage = () => {
                 Kitchen Insights
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Insight 1: Duration */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E9EFEF] flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-full bg-[#D9F2EC] flex items-center justify-center text-[#0D6E5D] shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-[#7E918E]">
-                      Your cylinder duration
-                    </p>
-                    <p className="text-sm font-bold text-[#0D2329] mt-0.5">
-                      You finish a cylinder every 18 days.
-                    </p>
-                  </div>
+              {trends?.insights?.hasData ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Insight label="Cylinder duration" value={`${trends.insights.cylinderDurationDays} days`} />
+                  <Insight label="Comparison vs last period" value={`${trends.insights.comparisonPercent}%`} />
+                  <Insight label="Peak cooking hour" value={trends.insights.peakCookingHours?.length ? trends.insights.peakCookingHours.map((hour) => `${hour}:00`).join(", ") : "Not reported"} />
                 </div>
-
-                {/* Insight 2: Comparison (Amber) */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E9EFEF] flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-full bg-[#FDF0D5] flex items-center justify-center text-[#C05621] shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="7" y1="17" x2="17" y2="7" />
-                      <polyline points="7 7 17 7 17 17" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-[#7E918E]">
-                      Consumption vs last week
-                    </p>
-                    <p className="text-sm font-bold text-[#0D2329] mt-0.5">
-                      This week's usage is 12% higher.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Insight 3: Peak Hours */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E9EFEF] flex items-center gap-3.5 sm:col-span-2 lg:col-span-1">
-                  <div className="w-11 h-11 rounded-full bg-[#D9F2EC] flex items-center justify-center text-[#0D6E5D] shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-[#7E918E]">
-                      Peak cooking hours
-                    </p>
-                    <p className="text-sm font-bold text-[#0D2329] mt-0.5">
-                      Dinner preparation peaks at 6:00 – 8:00 PM.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-5 border border-[#E9EFEF] text-sm text-[#6C807D]">No insight data reported for this period.</div>
+              )}
             </div>
           </main>
         </div>

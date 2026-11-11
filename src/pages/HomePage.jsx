@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
 import GaugeChart from "../components/GaugeChart";
 import CylinderSensorIllustration from "../components/CylinderSensorIllustration";
-import { getDashboardData } from "../services/api";
+import { getApiError, getPrototypeOverview } from "../services/api";
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -17,12 +17,20 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getDashboardData()
-      .then((data) => {
-        setDashboard(data);
+    const sensorId = localStorage.getItem("gassense_active_sensor_id");
+    getPrototypeOverview(sensorId)
+      .then((response) => {
+        const remainingWeight = response.gasRemainingGrams == null ? null : response.gasRemainingGrams / 1000;
+        const totalWeight = response.gasCapacityGrams == null ? null : response.gasCapacityGrams / 1000;
+        setDashboard({
+          device: { name: response.name, model: response.source, serialNumber: response.sensorId, connected: response.status === "PAIRED", connectionType: "Prototype simulator" },
+          cylinder: { totalWeight, remainingWeight, percentRemaining: response.gasRemainingPercent, status: response.gasStatus === "GOOD" ? "Good" : response.gasStatus, daysLeft: response.estimatedDaysLeft },
+          todayUsage: { kg: response.todaysUseKg, label: response.todaysUseKg == null ? "Not reported" : "Reported today" },
+          alertLimit: { percent: response.alertLimitPercent, channel: response.alertChannel },
+        });
       })
       .catch((err) => {
-        console.error("Failed to load dashboard data:", err);
+        console.error("Failed to load dashboard data:", getApiError(err));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -110,10 +118,10 @@ const HomePage = () => {
                   </span>
                   <div className="flex items-baseline gap-1 mt-0.5">
                     <span className="text-xl sm:text-2xl font-extrabold text-[#0D2329]">
-                      {cylinder.remainingWeight.toFixed(1)} kg
+                      {cylinder.remainingWeight == null ? "—" : `${cylinder.remainingWeight.toFixed(2)} kg`}
                     </span>
                     <span className="text-xs text-[#7E918E] font-medium">
-                      of {cylinder.totalWeight} kg
+                      of {cylinder.totalWeight == null ? "—" : `${cylinder.totalWeight} kg`}
                     </span>
                   </div>
                 </div>
@@ -125,7 +133,7 @@ const HomePage = () => {
                   </span>
                   <div className="mt-0.5">
                     <span className="text-xl sm:text-2xl font-extrabold text-[#0D6E5D]">
-                      ~{cylinder.daysLeft} Days
+                      {cylinder.daysLeft == null ? "—" : `~${cylinder.daysLeft} Days`}
                     </span>
                   </div>
                 </div>
@@ -146,7 +154,7 @@ const HomePage = () => {
                   </div>
 
                   <div className="text-[24px] font-extrabold text-[#0D2329] mt-3">
-                    {todayUsage.kg.toFixed(2)} kg
+                    {todayUsage.kg == null ? "—" : `${todayUsage.kg.toFixed(2)} kg`}
                   </div>
 
                   <div className="text-[11px] font-semibold text-[#0D6E5D] mt-1">
@@ -169,11 +177,11 @@ const HomePage = () => {
                   </div>
 
                   <div className="text-[24px] font-extrabold text-[#0D2329] mt-3">
-                    {alertLimit.percent}%
+                    {alertLimit.percent == null ? "—" : `${alertLimit.percent}%`}
                   </div>
 
                   <div className="text-[11px] font-medium text-[#7E918E] mt-1">
-                    Notify via SMS
+                    {alertLimit.channel ? `Notify via ${alertLimit.channel}` : "Not configured"}
                   </div>
                 </div>
               </div>
@@ -233,3 +241,4 @@ const HomePage = () => {
 };
 
 export default HomePage;
+

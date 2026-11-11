@@ -1,140 +1,79 @@
-/**
- * src/services/api.js
- * -------------------
- * API service layer for GasSense frontend.
- * 
- * BACKEND INTEGRATION:
- * - Configure your backend URL in `.env` (VITE_API_BASE_URL)
- * - Set VITE_USE_MOCK=false in `.env` when your backend server is running.
- * - When VITE_USE_MOCK=true, mock data from `src/data/mockData.js` is used.
- */
+import axios from "axios";
 
-import {
-  mockDashboardData,
-  mockTrendsData,
-  mockDeviceData,
-  mockSettingsData,
-} from "../data/mockData";
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
+export const apiClient = axios.create({
+  baseURL: API_URL.replace(/\/$/, ""),
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT || 10000),
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
+});
 
-// Helper for simulating async network latency with mock data
-const mockDelay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Generic HTTP fetch wrapper with headers and error handling
-async function request(endpoint, options = {}) {
-  const token = localStorage.getItem("token") || "";
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
-  };
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Request failed with status ${response.status}`);
+export function getApiError(error) {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.error?.message || error.response?.data?.message ||
+      (error.code === "ECONNABORTED" ? "The request timed out." : "Unable to reach the GasSense server.");
   }
-
-  return response.json();
+  return error?.message || "Request failed.";
 }
 
-/**
- * GET /api/dashboard
- * Fetch live sensor telemetry, cylinder status, remaining weight, days left.
- */
-export const getDashboardData = async () => {
-  if (USE_MOCK) {
-    await mockDelay();
-    return mockDashboardData;
-  }
-  return request("/dashboard");
-};
+const unwrap = (response) => response.data;
 
-/**
- * GET /api/trends?period=weekly
- * Fetch cylinder consumption breakdown (bars) and kitchen insights.
- */
-export const getTrendsData = async (period = "weekly") => {
-  if (USE_MOCK) {
-    await mockDelay();
-    return {
-      bars: mockTrendsData[period]?.bars ?? [],
-      totalKg: mockTrendsData[period]?.totalKg ?? 0,
-      insights: mockTrendsData.insights,
-    };
-  }
-  return request(`/trends?period=${period}`);
+export const getNearbySensors = () => apiClient.get("/api/v1/prototype/sensors").then(unwrap);
+export const getSessionContext = async () => {
+  const { sensors = [] } = await getNearbySensors();
+  return { sensors, sensorId: localStorage.getItem("gassense_active_sensor_id") || sensors.find((sensor) => sensor.status === "PAIRED")?.sensorId };
 };
-
-/**
- * GET /api/device
- * Fetch hardware diagnostics, battery %, firmware version, calibration schedule.
- */
-export const getDeviceInfo = async () => {
-  if (USE_MOCK) {
-    await mockDelay();
-    return mockDeviceData;
-  }
-  return request("/device");
+export const getPrototypeSensorStatus = (sensorId) => apiClient.get(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/status`).then(unwrap);
+export const getPrototypeOverview = (sensorId) => {
+  if (!sensorId) return Promise.reject(new Error("A sensor ID is required to load the overview."));
+  return apiClient.get(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/overview`).then(unwrap);
 };
-
-/**
- * GET /api/settings
- * Fetch user alert limits, SMS/push notification preferences, display units.
- */
-export const getSettings = async () => {
-  if (USE_MOCK) {
-    await mockDelay();
-    return mockSettingsData;
-  }
-  return request("/settings");
+export const getPrototypeDevice = (sensorId) => {
+  if (!sensorId) return Promise.reject(new Error("A sensor ID is required to load device details."));
+  return apiClient.get(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/device`).then(unwrap).then((data) => ({
+    ...data,
+    name: data.name || data.model,
+    serialNumber: data.serialNumber || data.sensorId,
+    connectionType: data.connectionType || data.bluetoothConnectionStatus || data.connectionStatus,
+    firmware: data.firmware || data.firmwareVersion,
+    batteryPercent: data.batteryPercent ?? data.batteryLevel,
+    batteryLabel: data.batteryLabel || data.batteryStatus,
+    signalStrength: data.signalStrengthStatus && data.signalStrength != null
+      ? `${data.signalStrengthStatus} (${data.signalStrength} dBm)`
+      : data.signalStrength,
+    nextCalibration: data.nextCalibration || data.nextCalibrationDate,
+    pairedSince: data.pairedSince || data.pairingDate,
+    cylinder: data.cylinder || {
+      size: data.cylinderSize,
+      gasType: data.gasType,
+      provider: data.provider,
+    },
+  }));
 };
-
-/**
- * PATCH /api/settings
- * Update alert limits and notification toggles.
- */
-export const updateSettings = async (settings) => {
-  if (USE_MOCK) {
-    await mockDelay(200);
-    return { ...mockSettingsData, ...settings };
-  }
-  return request("/settings", {
-    method: "PATCH",
-    body: JSON.stringify(settings),
-  });
+export const recalibratePrototypeSensor = (sensorId) => {
+  if (!sensorId) return Promise.reject(new Error("A sensor ID is required to recalibrate."));
+  return apiClient.post(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/recalibrate`).then(unwrap);
 };
-
-/**
- * POST /api/device/recalibrate
- * Trigger sensor ultrasonic tare routine.
- */
-export const recalibrateSensor = async () => {
-  if (USE_MOCK) {
-    await mockDelay(800);
-    return { success: true, message: "Calibration started. Please wait 60 seconds." };
-  }
-  return request("/device/recalibrate", {
-    method: "POST",
-  });
+export const unpairPrototypeSensor = (sensorId) => {
+  if (!sensorId) return Promise.reject(new Error("A sensor ID is required to unpair."));
+  return apiClient.delete(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/pair`).then(unwrap);
 };
-
-/**
- * DELETE /api/device/pair
- * Unpair active sensor.
- */
-export const unpairDevice = async () => {
-  if (USE_MOCK) {
-    await mockDelay(500);
-    return { success: true, message: "Device unpaired successfully." };
-  }
-  return request("/device/pair", {
-    method: "DELETE",
-  });
+export const pairSensor = (sensorId) => {
+  if (!sensorId) return Promise.reject(new Error("A sensor ID is required to pair a sensor."));
+  return apiClient.post(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/pair`).then(unwrap);
 };
+export const controlPrototypeGas = (sensorId, state) => apiClient.post(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/gas-control`, { state, confirmed: true }).then(unwrap);
+export const controlGas = (householdId, deviceId, state) => apiClient.post(`/api/v1/households/${encodeURIComponent(householdId)}/devices/${encodeURIComponent(deviceId)}/gas-control`, { state, confirmed: true }).then(unwrap);
+export const getTrendsData = (sensorId, period = "weekly") => {
+  if (!sensorId) return Promise.reject(new Error("A sensor ID is required to load analytics."));
+  return apiClient.get(`/api/v1/prototype/sensors/${encodeURIComponent(sensorId)}/analytics`, { params: { period } }).then(unwrap).then((data) => ({
+    totalKg: data.totalKg,
+    bars: (data.buckets || []).map((bucket) => ({ day: bucket.label, kg: bucket.usageKg })),
+    insights: data.insights,
+  }));
+};
+export const getSettings = (householdId) => apiClient.get(`/api/v1/households/${encodeURIComponent(householdId)}/settings`).then(unwrap);
+export const updateSettings = (householdId, settings) => apiClient.patch(`/api/v1/households/${encodeURIComponent(householdId)}/settings`, settings).then(unwrap);
+export const getDeviceInfo = (householdId, deviceId) => apiClient.get(`/api/v1/households/${encodeURIComponent(householdId)}/devices/${encodeURIComponent(deviceId)}`).then(unwrap);
+export const unpairDevice = (householdId, deviceId) => apiClient.delete(`/api/v1/households/${encodeURIComponent(householdId)}/devices/${encodeURIComponent(deviceId)}`).then(unwrap);
