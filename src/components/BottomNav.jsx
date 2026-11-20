@@ -80,8 +80,8 @@ const BottomNav = ({ active = "home" }) => {
   const navigate = useNavigate();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] z-50">
-      <div className="flex items-center justify-around h-[70px] px-3 pb-2 pt-1">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full h-[96px] bg-white/95 backdrop-blur-md border-t border-[#E1E7F0] shadow-[0_-4px_20px_rgba(0,0,0,0.04)] z-50">
+      <div className="flex items-center justify-around h-[82px] px-3 pb-2 pt-2">
         {NAV_ITEMS.map(({ id, label, route, Icon }) => {
           const isActive = active === id;
           return (
@@ -94,7 +94,7 @@ const BottomNav = ({ active = "home" }) => {
                 <Icon active={isActive} />
               </div>
               <span
-                className={`text-[11px] font-medium mt-1 tracking-tight transition-colors ${
+                className={`text-[16px] font-medium mt-1 tracking-tight transition-colors ${
                   isActive ? "text-[#0D6E5D] font-bold" : "text-[#627774]"
                 }`}
               >
@@ -104,6 +104,7 @@ const BottomNav = ({ active = "home" }) => {
           );
         })}
       </div>
+      <div className="absolute bottom-[8px] left-1/2 -translate-x-1/2 w-[140px] h-[5px] rounded-full bg-[#11192D]" />
     </nav>
   );
 };
